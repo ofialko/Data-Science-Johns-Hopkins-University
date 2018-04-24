@@ -1,0 +1,132 @@
+---
+title: "Activity monitoring"
+author: "Oleksandr Fialko"
+date: "11/17/2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Introduction
+
+It is now possible to collect a large amount of data about personal 
+movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or 
+Jawbone Up. These type of devices are part of the “quantified self” movement – 
+a group of enthusiasts who take measurements about themselves regularly to improve 
+their health, to find patterns in their behavior, or because they are tech geeks. 
+
+This project makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+### Loading and preprocessing the data
+```{r activity, echo = TRUE,cache=TRUE}
+activity <- read.csv('activity.csv',header = T,na.strings = 'NA')
+str(activity)
+```
+
+Transforming the 'date' column into Date type:
+```{r echo= TRUE,cache=TRUE}
+activity <- transform(activity,date = as.Date(date,"%Y-%m-%d"),interval=as.factor(interval))
+str(activity)
+```
+
+
+### Analysing number of steps taken per day
+Calculating the total number of steps taken per day:
+```{r echo= TRUE,cache=TRUE}
+steps_day <- tapply(activity$steps, as.factor(activity$date), sum,na.rm=TRUE)
+```
+
+Plotting historgram of the total number of steps taken per day:
+```{r echo=TRUE,cache=TRUE}
+hist(steps_day,breaks = 8,
+     main='Total number of steps taken per day',xlab='',col='red')
+```
+
+Calculating the mean and median of the total number of steps taken per day:
+```{r echo = TRUE,cache=TRUE}
+mean_val <- mean(steps_day)
+median_val <- median(steps_day)
+```
+The mean is `r mean_val`, median is `r median_val`.
+
+### Average daily activity pattern
+```{r echo=TRUE,cache=TRUE}
+daily_activity <- tapply(activity$steps, activity$interval, mean,na.rm=T)
+interval <- names(daily_activity)
+plot(interval,daily_activity,type='l',xlab = '5-minute interval',ylab='Average number of steps',
+     main='Average Daily Activity')
+```
+
+Which 5-minute interval on average contains the maximum number of steps?
+```{r echo=TRUE,cache=TRUE}
+indx <- which.max(daily_activity)
+max_val_interval <- interval[indx]
+max_val_interval
+```
+So, `r max_val_interval`th interval contains the maximum number of steps. 
+
+
+### Imputing missing values
+Total number of rows with missing values:
+```{r echo=TRUE,cache=TRUE}
+num <- apply(activity, 1, function(x) any(is.na(x)))
+sum(num)
+```
+All these missing values are in `steps` column.
+
+We use average number of steps from `daily_activity` array to fill the missing values in `steps` column.
+First, I create a new dataset, a copy of `activity` dataset:
+```{r echo= TRUE,cache=TRUE}
+activity_new <- activity
+```
+If `steps == NA` in the new dataset then change `steps` to average values, otherwise keep `steps` in the new dataset:
+```{r echo=TRUE,cache=TRUE}
+activity_new$steps <- apply(activity,1,function(x) 
+    ifelse(is.na(x['steps']),daily_activity[x['interval']],x['steps']))
+activity_new$steps <- as.numeric(activity_new$steps)
+```
+Total number of steps taken per day including imputed values:
+```{r echo=TRUE,cache=TRUE}
+steps_day_new <- tapply(activity_new$steps, as.factor(activity_new$date), sum,na.rm=TRUE)
+hist(steps_day_new,breaks = 8,
+     main='Total number of steps taken per day',xlab='',col='red')
+```
+
+Calculating the mean and median of the total number of steps taken per day including imputed values:
+```{r echo=TRUE,cache=TRUE}
+mean_val_new <- mean(steps_day_new)
+median_val_new <- median(steps_day_new)
+```
+So the new mean is `r mean_val_new`, median is `r median_val_new`. These two values are close to the original values. The mean and median number of steps per day are still around `10000`. Imputing missing data affected total number of steps, but not average values.
+
+### Differences in activity patters between weekdays and weekends
+
+New factor variable with two levels - "weekday" and "weekend": 
+```{r echo=TRUE,cache=TRUE}
+Weekends <- c('Saturday','Sunday')
+
+activity_new$weekday <- apply(activity_new,MARGIN = 1, function(x) 
+    ifelse(weekdays(as.Date(x['date'])) %in% Weekends,'weekend','weekday'))
+activity_new$weekday <- as.factor(activity_new$weekday)
+```
+
+Subsetting the dataset to separate activities performed during weekdays and weekends:
+```{r echo=TRUE,cache=TRUE}
+activity_new_weekends <- subset(activity_new,weekday == 'weekend')
+activity_new_weekdays <- subset(activity_new,weekday == 'weekday')
+```
+
+Comparing activities:
+```{r echo=TRUE,cache=TRUE}
+daily_activity_weekends <- tapply(activity_new_weekends$steps, 
+                                  activity_new_weekends$interval, mean,na.rm=T)
+daily_activity_weekdays <- tapply(activity_new_weekdays$steps, 
+                                  activity_new_weekdays$interval, mean,na.rm=T)
+
+df <- data.frame(interval = as.integer(rep(interval,2)),daily_activity = c(daily_activity_weekdays,daily_activity_weekends),weekday = c(rep('weekday',288),rep('weekend',288)))
+library(lattice)
+xyplot(daily_activity ~ interval | weekday,data=df,xlab = 'Interval',
+       ylab='Number of steps',layout=c(1,2),type='l',col='black')
+```
