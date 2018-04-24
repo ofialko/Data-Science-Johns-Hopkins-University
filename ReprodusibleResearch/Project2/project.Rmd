@@ -1,0 +1,123 @@
+---
+title: "Most harmful storm events"
+author: "Oleksandr Fialko"
+date: "11/20/2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+## Summary
+This analysis addresses two questions:
+
+* which types of events are most harmful to population health?
+* which types of events have the greatest economic consequences?
+
+
+## Data Processing
+Loading data into R:
+```{r echo=TRUE, cache=TRUE}
+storm_data <- read.csv('repdata-data-StormData.csv.bz2',header = T,sep = ',')
+dim(storm_data)
+```
+
+Examining the column names of the dataset:
+```{r echo =TRUE, cache=TRUE}
+col_names <- names(storm_data)
+col_names
+```
+
+
+## Most harmful event to population health
+Health related columns are `FATALITIES` and `INJURIES`:
+```{r echo=TRUE,cache=TRUE}
+str(storm_data$FATALITIES)
+str(storm_data$INJURIES)
+```
+
+`TORNADO` appears to be the most harmful event causing most fatalities and injuries:
+```{r echo=TRUE,cache=TRUE}
+fatalities_event <- tapply(storm_data$FATALITIES, storm_data$EVTYPE, sum)
+injuries_event <- tapply(storm_data$INJURIES, storm_data$EVTYPE, sum)
+most_fatal_event <- fatalities_event[which.max(fatalities_event)]
+most_injury_event <- injuries_event[which.max(injuries_event)]
+print(paste('Most fatal event is',names(most_fatal_event),'with',most_fatal_event[1],'fatalities',sep = ' '))
+print(paste('Event causing most injuries is',names(most_injury_event),'with',most_injury_event[1],'injuries',sep = ' '))
+```
+
+We combine `INJURIES` and `FATALITIES` for each event in one sorted data frame with the total contribution:
+```{r echo=TRUE,cache=TRUE}
+df1 <- data.frame(Event = names(fatalities_event), Fatalities_count = fatalities_event)
+df2 <- data.frame(Event = names(injuries_event), Injuries_count = injuries_event)
+df_merged <- merge(df1,df2,by='Event')
+df_merged$Count <- df_merged$Fatalities_count + df_merged$Injuries_count
+df_merged$Count <- df_merged$Count/sum(df_merged$Count)
+indx = order(df_merged$Count,decreasing = T)
+df <- df_merged[indx,]
+```
+
+We visualize the contributions from several most harmful events via bar plot:
+```{r echo =TRUE, cache=TRUE}
+library(ggplot2)
+
+df <- transform(df,Event=factor(Event,levels = Event),Count = 100*Count)
+ggplot(df[1:5,],aes(x=Event,y=Count)) + geom_bar(stat = 'identity',fill=c('red',rep('black',4)))+
+    labs(title='5 most harmful events to population health')+xlab('')+ylab('Contribution, %')
+```
+
+## Event with the greatest economic consequences
+
+Here we are interested in `PROPDMG` and `CROPDMG` variables.
+We repeat the above analysis but with respect to these new variables.
+```{r echo=TRUE,cache=TRUE}
+prop_event <- tapply(storm_data$PROPDMG, storm_data$EVTYPE, sum,na.rm=T)
+crop_event <- tapply(storm_data$CROPDMG, storm_data$EVTYPE, sum,na.rm=T)
+most_prop_event <- prop_event[which.max(prop_event)]
+most_crop_event <- crop_event[which.max(crop_event)]
+print(paste('Most property damages are caused by ',names(most_prop_event),'with',most_prop_event[1],'damages',sep = ' '))
+print(paste('Most crop damages are caused by ',names(most_crop_event),'with',most_crop_event[1],'damages',sep = ' '))
+```
+
+We create two data frames for `PROPDMG` and `CROPDMG` respectively
+```{r echo=TRUE,cache=TRUE}
+df1 <- data.frame(Event = names(prop_event), Count = prop_event/sum(prop_event))
+indx <- order(df1$Count,decreasing = T); df1 <- df1[indx,]
+df1 <- transform(df1,Event=factor(Event,levels = Event),Count = 100*Count)
+df2 <- data.frame(Event = names(crop_event), Count = crop_event/sum(crop_event))
+indx <- order(df2$Count,decreasing = T); df2 <- df2[indx,]
+df2 <- transform(df2,Event=factor(Event,levels = Event),Count = 100*Count)
+```
+
+```{r echo=TRUE, cache=TRUE,fig.height=9,fig.width=17,fig.align='center'}
+library(ggplot2)
+library(gridExtra)
+plot1 <- ggplot(df1[1:5,], aes(x = Event,y=Count)) +
+    geom_bar(width = 1, colour = "black",stat = 'identity',aes(fill=Event)) + 
+    xlab('')+ylab('Contribution, %')+
+    labs(title='5 most harmful events \n causing property damages')+
+    coord_polar()+theme(legend.position='none',text=element_text(size=18))
+plot2 <- ggplot(df2[1:5,], aes(x = Event,y=Count)) +
+    geom_bar(width = 1, colour = "black",stat = 'identity',aes(fill=Event)) + 
+    xlab('')+ylab('')+
+    labs(title='5 most harmful events \n causing crop damages')+
+    coord_polar()+theme(legend.position='none',text=element_text(size=18))
+grid.arrange(plot1,plot2,ncol=2)
+
+```
+
+## Results
+
+Storm events are devastating causing injuries, fatalities and lead to great economic consequences.
+It appears that `TORNADO` is the most harmful to population health and causes the most properties damages, while `HAIL` causes the most crops damages.
+
+
+
+
