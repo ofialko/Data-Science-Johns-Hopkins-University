@@ -1,0 +1,228 @@
+---
+title: "Data Science: Milestone Report"
+author: "Oleksandr Fialko"
+date: "1/25/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE,message=FALSE}
+library(rmarkdown)
+library(markdown)
+library(tm)
+library(ggplot2)
+library(gridExtra)
+library(tidyr)
+library(dplyr)
+library(RWeka)
+library(plotly)
+load('Report_Data.RData')
+```
+
+#[//]: (to share render(...) and rpubUpload)
+
+## 0 Introduction
+
+Here I report on my first steps towards building a shiny application that is able to predict the next word. The full analysis is available in my github repo. Here I briefly scratch what I have done there.
+
+In this capstone I have applied data science in the area of natural language processing. As a first step toward working on this project, I have familiarized myself with Natural Language Processing, Text Mining, and the associated tools in R. 
+Two sources were of particular importance for me:
+
+ - Google
+ - [Text mining infrastucture in R](https://www.jstatsoft.org/article/view/v025i05)
+
+
+I have completed the following three tasks:
+
+ 1. [Getting and cleaning text data](#sec1)
+ 2. [Exploratory data analysis](#sec2)
+ 3. [Building basic n-gram model](#sec3)
+ 4. [Future plans](#sec4)
+
+## 1 Getting and cleaning data {#sec1}
+
+The goal of this task is to get familiar with the data and do the necessary cleaning.
+The data is from a corpus called HC Corpora ([www.corpora.heliohost.org](www.corpora.heliohost.org)).
+
+
+As a first step I created a directory to store data:
+
+```{r, eval=FALSE, echo=TRUE}
+if (!dir.exists('data')) {
+    dir.create('data')
+}
+```
+
+After that I downloaded data:
+
+```{r, eval=FALSE, echo=TRUE}
+download.file(url = link,destfile = 'data/capstonedataset.zip')
+unzip('data/capstonedataset.zip',exdir = 'data')
+```
+
+As a result I got four large datasets `de_DE`, `en_US`, `fi_FI`, `ru_RU`. For this project I will use the English database `en_US`. It contains three sources of text, namely blogs, tweets and news. The entire dataset is relatively large `~500 Mb`.
+We don't need to load in and use all of the data. Often relatively few randomly selected rows need to be included to get an accurate approximation to results that would be obtained using all the data. 
+
+For the purpose of this project I used a smaller subset of the data, roughly `10%` of the entire dataset. For example, the following code snippet loads blogs data:
+
+```{r, eval=FALSE,echo=TRUE}
+blogs <- readLines('data/final/en_US/en_US.blogs.txt',skipNul = T)
+indx  <- rbinom(length(blogs)*.1,length(blogs),0.1)
+blogs <- blogs[indx]
+```
+
+The same procedure was repeated for news and tweets.
+
+The sampled data was stored on the hard disk:
+
+```{r, eval=FALSE,echo=TRUE}
+writeLines(blogs,'data/samples/blogs.txt')
+writeLines(tweets,'data/samples/tweets.txt')
+writeLines(news,'data/samples/news.txt')
+```
+
+The nest step is to clean the data.
+For this purpose I used the R text mining framework `tm`:
+
+```{r, eval=FALSE,echo=TRUE}
+library(tm)
+```
+
+To facilitate analysis, I created corpus of the sampled data:
+```{r, eval=FALSE,echo=TRUE}
+data_corpus <- Corpus(DirSource('data/samples/'), readerControl = list(language='en-US'))
+summary(data_corpus)
+```
+
+```{r, echo=FALSE}
+summary(data_corpus)
+```
+
+Now we can start cleaning the data in the corpus using `tm` functionality.
+The following steps have been performed in this respect:
+
+ - removing urls
+ - removing tags, i.e. phrases starting with \@ and \#
+ - removing numbers and punctuation
+ - lowering text
+ - removing stop words
+ 
+```{r, eval=FALSE,echo=TRUE}
+pattern = '(http|ftp|https)://[[:alnum:][:punct:]]*'
+removeURL <- function(x) gsub(pattern,"",x)
+removeTags <- function(x) gsub("(#|@)\\S+","",x)
+
+data_corpus <- tm_map(data_corpus,content_transformer(removeURL))
+data_corpus <- tm_map(data_corpus,content_transformer(removeTags))
+data_corpus <- tm_map(data_corpus,removeNumbers)
+data_corpus <- tm_map(data_corpus,removePunctuation)
+data_corpus <- tm_map(data_corpus,stripWhitespace)
+data_corpus <- tm_map(data_corpus,content_transformer(tolower))
+data_corpus0 <- data_corpus
+data_corpus <- tm_map(data_corpus,removeWords,stopwords("english"))
+```
+ 
+It is also important to perform profanity filtering by removing 'bad' words 
+we do not want to predict. I used Offensive/Profane word list
+from [Luis von Ahn's research group](https://www.cs.cmu.edu/~biglou/resources/)
+ 
+```{r,eval=FALSE,echo=TRUE}
+link = 'https://www.cs.cmu.edu/~biglou/resources/bad-words.txt'
+download.file(url = link,destfile = 'data/bad-words.txt')
+bad_words <- readLines('data/bad-words.txt')
+bad_words <- bad_words[2:length(bad_words)]
+data_corpus  <- tm_map(data_corpus,removeWords,bad_words)
+data_corpus0 <- tm_map(data_corpus0,removeWords,bad_words)
+```
+ 
+
+## 2 Exploratory data analysis {#sec2}
+
+The first step in building a predictive model for text is understanding the distribution and relationship between the words, tokens, and phrases in the text.
+
+Interesting facts about the corpus:
+
+ - The longest sentence is found in blogs data having 40833 characters. The longest tweet contains 
+ 140 and the longest news entity is 11384 characters long.
+ - The ratio of number of entities with the word "love" to the number of entities with the word "hate" is found to be 4.4 in blogs, 4.1 in tweets and 3.3 in news sources.
+
+
+I created a term document matrix for each of the three sources in the dataset:
+
+```{r, eval=FALSE,echo=TRUE}
+tdm.blogs  <- TermDocumentMatrix(data_corpus[1])
+tdm.news   <- TermDocumentMatrix(data_corpus[2])
+tdm.tweets <- TermDocumentMatrix(data_corpus[3])
+```
+
+Having these objects in disposal, it is now easy to perform some interesting  investigations. It does not make sense to count lines and words. Instead, I focused
+on the content of the dataset. In particular, I was interested in the fraction of unique words and average number of words per line. 
+For the former task, I created vocabulary of all unique words across the dataset as well as three vocabularies for each source in the dataset. The three fractions have been calculated.
+For the later task, I tokenized the data source and simply counted tokens in each entry (I called it 'line'). The results are shown below:
+
+```{r, eval=TRUE,echo=FALSE,fig.align='center'}
+g
+```
+
+It is interesting that tweets are much shorter and less sophisticated in terms of unique words used than two other sources. Blogs and news appeared to be similar.
+
+Some words are more frequent than others. The distributions of word frequencies
+are shown below:
+
+```{r, eval=TRUE,echo=FALSE,fig.width=9}
+grid.arrange(g.freq.blogs,g.freq.news,g.freq.tweets,ncol=3)
+```
+
+The frequency distribution of three-grams:
+
+```{r, eval=TRUE, echo=FALSE, fig.width=12}
+grid.arrange(g.freq.blogs0_3,g.freq.news0_3,g.freq.tweets0_3,ncol=3)
+```
+
+To proceed I combined all sources into one:
+
+```{r, eval=FALSE}
+tdm.combined <- c(tdm.blogs,tdm.news,tdm.tweets)
+```
+
+We do not need to use all the words in the resulting document matrix. Only fraction of them
+can cover a significant fraction of the total words used.
+The following figure shows the coverage versus number of unique words (sorted by their frequencies):
+
+```{r, fig.align='center',eval=TRUE, echo=FALSE,warning=FALSE,message=FALSE,fig.height=4,fig.width=5}
+coverage_plot
+```
+
+To cover 0.99 it is enough to use 14623 words instead of the total number 20584. The difference is the number of words which are rarely used.
+
+
+## 3 Building basic n-gram model {#sec3}
+
+I have build a simple n-gram model, which does the following:
+
+ - if a user enters one word, the model looks at the frequency distribution of 2-grams starting with that word, finds 3 the most frequent such 2-grams and outputs the second words in them.
+ 
+ - if a user enters two or more words, the model looks for the most frequent 3-grams starting with the previous 2 words entered. If there are no 3-grams, the model looks at 2-grams
+ starting with the previous word entered.
+
+ 
+It works like this:
+
+```{r}
+predict_next_word('I love')
+```
+
+
+## 4 Future plans {#sec4}
+
+ - I have only used 10% of data from the datasets. I am planning to increase the amount of data used by downloading it in 10% chunks, analyzing  and merging the chunks.
+
+ - I am planning to do more cleaning. I will identify foreign words by looking for characters which are not ASCII encoded.
+ 
+ - I will analyse grammar of the entered word sequence and try to predict new word using grammatical rules. For example, a noun should be followed by a verb in most cases. The next word should comply with English grammar.
+
+
+
