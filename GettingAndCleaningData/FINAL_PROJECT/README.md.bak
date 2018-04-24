@@ -1,0 +1,15 @@
+# Getting and Cleaning Data, final project
+
+The script run_analysis.R does the following
+
+- creates a folder "data" and downloads projects data into it
+- unzips the data, since project data are all enclosed in a single .zip file
+- reads variables names into "features". These are used to name the columns in the final data set
+- reads activity label names into "activity_labels". These are used to name activity of every measurement   
+- reads measurements data and corresponing labels  into "X_..." and "y_..." data sets
+- merges train and test data sets into "X_data" and "y_data"
+- uses "grep" function to extract only meassuremtns on the mean and standart deviation
+- uses a combination of "cbind" and "merge" functions to name the activities in the data set 
+- uses "sub" function and regular expressions to label the data set with descriptive variable names
+- aggregates the data set for each activity and subject
+- writes the final tidy data set into "tidy_data_set.txt" file.	
