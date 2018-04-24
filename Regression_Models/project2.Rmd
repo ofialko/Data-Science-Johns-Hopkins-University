@@ -1,0 +1,109 @@
+---
+title: "Analysing car performance"
+author: "Oleksand Fialko"
+date: "December 8, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Summary
+Cars with manual transmission seem to be more efficient than cars with automatic transmission. For a given number of cylinders, cars with manual transmission covers $2.56\pm 1.30$ miles per gallon more than cars with automatic transmission. However, this conclusion is not robust, since the p-value of that estimate is $0.06$ which is slightly larger than the standard type 1 error rate $0.05$. More data is needed to make final conclusion.
+
+## Exploratory data analysis
+
+The data
+```{r echo = TRUE}
+library(ggplot2)
+data("mtcars")
+head(mtcars)
+```
+
+Three variables are of particular interest:
+
+1. mpg: Miles/(US) gallon
+2. cyl: Number of cylinders
+3. wt:  Weight (1000 lbs)
+
+Simple box-plot in fig.1 suggests that cars with manual transmission are more efficient.
+I create two vectors containing data for `mpg` of cars with automatic and manual transmissions. I perform t-test to see if their means are different: 
+```{r echo=TRUE}
+data_auto <- subset(mtcars,am==0)$mpg
+data_manu <- subset(mtcars,am==1)$mpg
+t<- t.test(data_manu,data_auto)
+t$p.value
+```
+The p-value is significant (<0.05), so the means are different.
+
+## Fitting linear regression model 
+
+We need to be careful when fitting linear regression model, since it appears 
+that weight is related to both the number of cylinders and transmission as can be seen from fig.2 in the appendix. Heavy cars have larger number of cylinders and have mostly automatic transmission. I will disregard `wt` in this analysis.
+
+We will fit several linear models using `am`, `cyl` as predictors and `mpg` as outcome:
+
+```{r echo=TRUE}
+fit1 <- lm(mpg~factor(am),data=mtcars)
+fit2 <- lm(mpg~factor(am)+factor(cyl),data=mtcars)
+fit3 <- lm(mpg~factor(am)*factor(cyl),data=mtcars)
+```
+
+Analysis of variances allows us to choose the best model
+```{r echo=TRUE}
+anova(fit1,fit2)
+anova(fit2,fit3)
+```
+Apparently, the second `fit2` model is the best one among those three models.
+
+Residual plots in fig. 3 look good: they have near-zero mean (1-st plot) and follow approximately normal distribution (2nd plot).
+
+
+Model coefficients:
+```{r echo=TRUE}
+summary(fit2)$coef
+```
+As can be seen from the `Pr(>|t|)` values, all the coefficient seems to be significant. However, the p-value of `factor(am)1` is $0.06$ slightly larger than the standard $0.05$. 
+
+## Intepretation:
+
+For a given number of cylinders, cars with manual transmission travels  
+$2.56\pm 1.3$ miles per gallon more than cars with automatic transmission. 
+However, we need to be cautious since the p-value of this estimate slightly
+exceeds the type 1 error rate.
+
+\newpage
+## Appendix 
+### Fig1:
+```{r echo=TRUE,fig.height=4,fig.width=5}
+g<- ggplot(data = mtcars,aes(x=factor(am),y=mpg,fill=factor(am)))
+g<- g   + geom_boxplot()+ geom_point(size=5,alpha=0.5)
+g<- g + xlab('Transmission') + ylab('Miles/(US) gallon')
+g<- g + scale_x_discrete(labels=c('automatic','manual'))
+g<- g + theme(legend.position='none')
+g
+```
+
+### Fig2:
+```{r echo=TRUE,fig.height=4,fig.width=10}
+library(gridExtra)
+h1<- ggplot(data = mtcars,aes(x=wt,y=mpg))
+h1<- h1 + geom_point(size=10, aes(col=factor(cyl))) 
+h1 <- h1 + xlab('Weight (1000 lbs)') + ylab('Miles/(US) gallon')
+h1<-h1+ guides(col=guide_legend(title="Cylinders"))
+
+h2<- ggplot(data = mtcars,aes(x=wt,y=mpg))
+h2<- h2 + geom_point(size=10, aes(col=factor(am)))+ xlab('Weight (1000 lbs)')  
+h2<- h2 + ylab('Miles/(US) gallon')
+h2<- h2 + guides(col=guide_legend(title="Transmission"))
+grid.arrange(h1,h2,ncol=2,nrow=1)
+```
+
+### Fig3:
+```{r echo=TRUE}
+par(mfrow=c(2,2))
+plot(fit2)
+```
+
+
+
