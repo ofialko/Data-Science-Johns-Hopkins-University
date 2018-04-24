@@ -1,0 +1,35 @@
+---
+title: "Untitled"
+output: html_document
+self_contained: no
+---
+
+
+```{r, echo=F, warning=F, message=F}
+#load leaflet package for R
+library(leaflet)
+library(maps)
+library(rgdal)
+library(plotKML)
+
+#url <- "http://hiking.waymarkedtrails.org/en/routebrowser/1225378/gpx"
+#download.file(url, destfile = "pct.gpx",method = 'curl')
+#pct <- readGPX(gpx.file =  "pct.gpx")
+
+
+mapStates = map("state", fill = TRUE, plot = FALSE, region = c('california', 'oregon', 'washington:main'))
+
+your.map <- leaflet() %>%
+
+            # Add layer
+            addTiles(urlTemplate = "http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png") %>%
+            addPolylines(color="red", , weight = 4,  popup="PCT")  %>%
+            addMarkers(-116.4697, 32.60758, popup = "Campo") %>%
+            addMarkers(-120.7816, 49.06465, popup = "Manning Park, Canada") %>%
+            addPolygons(data=mapStates, fillColor = heat.colors(3, alpha = NULL), stroke = FALSE) %>%
+            
+            # Add legend
+            addLegend(position = 'topright', colors = "red", labels = "PCT", opacity = 0.4,
+                      title = 'Legend')
+your.map
+```

@@ -1,0 +1,17 @@
+---
+title: "My fancy presentation"
+author: "Oleksandr Fialko"
+date: "12/15/2016"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## My new slide
+
+```{r echo=F,fig.align='center'}
+plot(mtcars$wt,mtcars$mpg,xlab = 'Weight',ylab = 'MPG')
+```
+

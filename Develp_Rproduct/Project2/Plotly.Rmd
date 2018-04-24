@@ -1,0 +1,29 @@
+---
+title: "Basic R Markdown Presentation & Plotly"
+author: "Oleksandr Fialko"
+date: "12/21/2016"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Popularity of selected programming languages (according to Tiobe.com)
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+library(plotly)
+lan <- c('Java','C','C++','Python','C#','JavaScript','Ruby','R','MATLAB')
+pop <- c(17.856,8.726,5.335,4.239,3.171,2.862,2.147,1.826,1.818)
+share <- pop/sum(pop)
+df <- data.frame(Language = lan, Popularity = pop,share = share)
+```
+```{r echo=FALSE,warning=FALSE}
+p <- plot_ly(df,labels = ~lan,values=~pop,hoverinfo='percent',
+             textinfo = 'label',text='percent') %>%
+    add_pie(hole=0.6) %>%
+    layout(xaxis=list(showgrid=FALSE,zeroline=FALSE,showticklabels=FALSE),
+           yaxis=list(showgrid=FALSE,zeroline=FALSE,showticklabels=FALSE))
+p
+```
+
