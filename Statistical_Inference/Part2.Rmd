@@ -1,0 +1,95 @@
+---
+title: "Basic Inferential Data Analysis"
+author: "Oleksandr Fialko"
+date: "11/28/2016"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+`ToothGrowth` dataset contains the length of odontoblasts (cells responsible for tooth growth) in 60 guinea pigs. Each animal received one of three dose levels of vitamin C (0.5, 1, and 2 mg/day) by one of two delivery methods, orange juice (coded as OJ) or ascorbic acid (a form of vitamin C and coded as VC).
+
+```{r cache=TRUE}
+data("ToothGrowth")
+str(ToothGrowth)
+```
+
+Subsetting on `OJ` and `CV`:
+
+```{r cache=TRUE}
+data_OJ <- subset(ToothGrowth,supp=='OJ')
+data_VC <- subset(ToothGrowth,supp=='VC')
+```
+
+Visualizing the resulting datasets:
+
+```{r cache=TRUE, fig.height=4,fig.width=10,warning=FALSE}
+library(ggplot2)
+library(gridExtra)
+g1<-ggplot(data_VC,aes(x=as.factor(dose),y=len,fill=as.factor(dose)))
+plot1<-g1+geom_boxplot()+labs(fill='Dose',x='Dose',y='Length',title='VC')+
+    coord_cartesian(ylim = c(5,30))
+g2<-ggplot(data_OJ,aes(x=as.factor(dose),y=len,fill=as.factor(dose)))
+plot2<-g2+geom_boxplot()+labs(fill='Dose',x='Dose',y='Length',title='OJ')+
+    coord_cartesian(ylim = c(5,30))
+grid.arrange(plot1,plot2,ncol=2)
+```
+
+Below I run several `t.test` to check different hypothesis derived from 
+the naive visual analysis. I will report p-values. If a p-value is below 0.05, then a hypothesis is correct.
+
+### <u>Hypothesis 1</u>: Higher Dose of VC increases the length of odontoblasts
+
+```{r}
+d05_VC <- data_VC[data_VC$dose==0.5,]$len
+d10_VC <- data_VC[data_VC$dose==1.0,]$len
+test<-t.test(d05_VC,d10_VC,var.equal = TRUE,paired = FALSE)
+test$p.value
+```
+
+```{r}
+d20_VC <- data_VC[data_VC$dose==2.0,]$len
+test<-t.test(d10_VC,d20_VC,var.equal = TRUE,paired = FALSE)
+test$p.value
+```
+
+
+### <u>Hypothesis 2</u>: Higher Dose of OJ increases the length of odontoblasts
+
+```{r}
+d05_OJ <- data_OJ[data_OJ$dose==0.5,]$len
+d10_OJ <- data_OJ[data_OJ$dose==1.0,]$len
+test<-t.test(d05_OJ,d10_OJ,var.equal = TRUE,paired = FALSE)
+test$p.value
+```
+
+```{r}
+d20_OJ <- data_OJ[data_OJ$dose==2.0,]$len
+test<-t.test(d10_OJ,d20_OJ,var.equal = TRUE,paired = FALSE)
+test$p.value
+```
+
+### <u>Hypothesis 3</u>: OJ is more efficient than VC in growing odontoblasts
+
+```{r}
+test<-t.test(d05_OJ,d05_VC,var.equal = TRUE,paired = FALSE)
+test$p.value
+```
+
+```{r}
+test<-t.test(d10_OJ,d10_VC,var.equal = TRUE,paired = FALSE)
+test$p.value
+```
+
+```{r}
+test<-t.test(d20_OJ,d20_VC,var.equal = TRUE,paired = FALSE)
+test$p.value
+```
+
+## Results:
+
+All three hypothesis seem to be correct except one statement:
+when the dose is 2 mg/day, the length of odontoblasts seem do not depend 
+on the method of delivery.
