@@ -1,0 +1,119 @@
+---
+title: "Programming in R 1"
+author: "Oleksandr Fialko"
+date: "11/22/2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Air pollution data set
+
+The file contains 332 comma-separated-value (CSV) files containing pollution monitoring data for fine particulate matter (PM) air pollution at 332 locations in the United States. Each file contains data from a single monitor and the ID number for each monitor is contained in the file name. For example, data for monitor 200 is contained in the file "200.csv". Each file contains three variables:
+
+* Date: the date of the observation in YYYY-MM-DD format (year-month-day)
+* sulfate: the level of sulfate PM in the air on that date (measured in micrograms per cubic meter)
+* nitrate: the level of nitrate PM in the air on that date (measured in micrograms per cubic meter)
+
+### Getting data
+
+```{r echo=TRUE, cache=TRUE}
+download.file('https://d396qusza40orc.cloudfront.net/rprog%2Fdata%2Fspecdata.zip',destfile = 'specdata.zip')
+unzip('specdata.zip')
+```
+
+### Pollutant mean
+
+Function named 'pollutantmean' calculates the mean of a pollutant (sulfate or nitrate) across a specified list of monitors. The function 'pollutantmean' takes three arguments: 'directory', 'pollutant', and 'id'. Given a vector monitor ID numbers, 'pollutantmean' reads that monitors' particulate matter data from the directory specified in the 'directory' argument and returns the mean of the pollutant across all of the monitors, ignoring any missing values coded as NA. 
+
+```{r echo=TRUE,cache=TRUE}
+pollutantmean <- function(directory,pollutant,id = 1:332){
+  data <- numeric()
+  for (i in id) {
+    if (i<10) {
+      data_i <- read.csv(paste(directory,'/00',i,'.csv',sep = ''))
+    }
+    else if (i>9 && i<100) {
+      data_i <- read.csv(paste(directory,'/0',i,'.csv',sep = ''))
+    }
+    else{
+      data_i <- read.csv(paste(directory,'/',i,'.csv',sep = ''))
+    }
+    data <- c(data,data_i[,pollutant])
+  }
+  mean(data,na.rm = T)
+}
+```
+
+Testing:
+```{r echo=TRUE,cache=TRUE}
+pollutantmean(directory = 'specdata/',pollutant = 'sulfate')
+```
+
+### Number of completely observed cases
+Function named 'complete' reads a directory full of files and reports the number of completely observed cases in each data file. The function should return a data frame where the first column is the name of the file and the second column is the number of complete cases. 
+
+```{r echo=TRUE,cache=TRUE}
+complete <- function(directory, id=1:332){
+  df <- data.frame()
+  for (i in id) {
+    if (i<10) {
+      data_i <- read.csv(paste(directory,'/00',i,'.csv',sep = ''))
+    }
+    else if (i>9 && i<100) {
+      data_i <- read.csv(paste(directory,'/0',i,'.csv',sep = ''))
+    }
+    else{
+      data_i <- read.csv(paste(directory,'/',i,'.csv',sep = ''))
+    }
+    df<-rbind(df,c(i,sum(!is.na(data_i$sulfate) & !is.na(data_i$nitrate))))
+  }
+  colnames(df)<-c('id','nobs')
+  return(df)
+}
+```
+
+Testing:
+```{r echo=TRUE,cache=TRUE}
+df <-complete(directory = 'specdata/')
+head(df)
+```
+
+### 
+
+Function named 'corr' takes a directory of data files and a threshold for complete cases and calculates the correlation between sulfate and nitrate for monitor locations where the number of completely observed cases (on all variables) is greater than the threshold. The function should return a vector of correlations for the monitors that meet the threshold requirement. If no monitors meet the threshold requirement, then the function should return a numeric vector of length 0. 
+
+```{r echo=TRUE, cache=TRUE}
+corr <- function(directory, threshold=0){
+  vec <- numeric()
+  df <- complete(directory=directory)
+  for (i in df$id) {
+    if (df[i,'nobs']>threshold) {
+      if (i<10) {
+        data_i <- read.csv(paste(directory,'/00',i,'.csv',sep = ''))
+      }
+      else if (i>9 && i<100) {
+        data_i <- read.csv(paste(directory,'/0',i,'.csv',sep = ''))
+      }
+      else{
+        data_i <- read.csv(paste(directory,'/',i,'.csv',sep = ''))
+      }
+      corr <- cor(data_i$nitrate,data_i$sulfate,use="pairwise.complete.obs")
+      vec <- c(vec,corr)     
+    }
+  }
+  return(vec)
+}
+```
+
+Testing:
+```{r echo=TRUE,cache=TRUE}
+cr <- corr("specdata", 150)
+head(cr)
+summary(cr)
+```
+
+
+
